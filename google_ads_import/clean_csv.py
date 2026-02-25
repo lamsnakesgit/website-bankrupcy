@@ -62,33 +62,74 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
 
     data_rows = rows[header_row_idx + 1:]
     
-    # Adding 'Action' and 'Ad type' for better recognition by Web UI
+    # Headers for Google Ads Bulk Upload (Web UI)
     new_fieldnames = [
-        "Action", "Campaign", "Ad group", "Ad type", "Keyword", 
+        "Action", "Campaign", "Campaign status", "Budget", "Budget type", "Campaign type",
+        "Ad group", "Ad group status", "Ad type", "Keyword", 
         "Headline 1", "Headline 2", "Headline 3", 
         "Description 1", "Description 2", "Max CPC", "Final URL"
     ]
     utm_string = "?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}"
 
+    campaigns_created = set()
+    ad_groups_created = set()
     ads_created = set()
 
-    # utf-8-sig for Excel/Google Sheets compatibility
-    with open(output_file, mode='w', encoding='utf-8-sig', newline='') as fout:
+    # Using 'utf-8' without BOM is sometimes safer for Web UI, but Google Ads usually handles utf-8-sig well.
+    # Let's use utf-8 for max compatibility.
+    with open(output_file, mode='w', encoding='utf-8', newline='') as fout:
         writer = csv.DictWriter(fout, fieldnames=new_fieldnames, delimiter=',')
         writer.writeheader()
         
         for row in data_rows:
             if not any(row): continue
             
-            campaign = row[mapping_indices["Campaign"]].strip() if "Campaign" in mapping_indices else ""
-            ad_group = row[mapping_indices["Ad group"]].strip() if "Ad group" in mapping_indices else ""
+            # Extract basic info
+            orig_campaign = row[mapping_indices["Campaign"]].strip() if "Campaign" in mapping_indices else ""
+            orig_ad_group = row[mapping_indices["Ad group"]].strip() if "Ad group" in mapping_indices else ""
+            
+            campaign = orig_campaign
+            ad_group = orig_ad_group
             
             if replace_map:
                 for old, new in replace_map.items():
                     campaign = campaign.replace(old, new)
                     ad_group = ad_group.replace(old, new)
 
-            # 1. KEYWORD ROW
+            if not campaign: continue
+
+            # 1. CAMPAIGN CREATION ROW
+            if campaign not in campaigns_created:
+                camp_row = {
+                    "Action": "Add",
+                    "Campaign": campaign,
+                    "Campaign status": "Enabled",
+                    "Budget": "500",
+                    "Budget type": "Daily",
+                    "Campaign type": "Search",
+                    "Ad group": "", "Ad group status": "", "Ad type": "", "Keyword": "",
+                    "Headline 1": "", "Headline 2": "", "Headline 3": "",
+                    "Description 1": "", "Description 2": "", "Max CPC": "", "Final URL": ""
+                }
+                writer.writerow(camp_row)
+                campaigns_created.add(campaign)
+
+            # 2. AD GROUP CREATION ROW
+            ad_group_key = (campaign, ad_group)
+            if ad_group and ad_group_key not in ad_groups_created:
+                ag_row = {
+                    "Action": "Add",
+                    "Campaign": campaign,
+                    "Ad group": ad_group,
+                    "Ad group status": "Enabled",
+                    "Campaign status": "", "Budget": "", "Budget type": "", "Campaign type": "",
+                    "Ad type": "", "Keyword": "", "Headline 1": "", "Headline 2": "", "Headline 3": "",
+                    "Description 1": "", "Description 2": "", "Max CPC": "", "Final URL": ""
+                }
+                writer.writerow(ag_row)
+                ad_groups_created.add(ad_group_key)
+
+            # 3. KEYWORD ROW
             keyword = row[mapping_indices["Keyword"]].strip().strip('"') if "Keyword" in mapping_indices else ""
             max_cpc = row[mapping_indices["Max CPC"]].strip().replace(',', '.') if "Max CPC" in mapping_indices else ""
             
@@ -97,17 +138,18 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                     "Action": "Add",
                     "Campaign": campaign,
                     "Ad group": ad_group,
-                    "Ad type": "", # Leave empty for keywords
                     "Keyword": keyword,
                     "Max CPC": max_cpc,
+                    "Campaign status": "", "Budget": "", "Budget type": "", "Campaign type": "",
+                    "Ad group status": "", "Ad type": "",
                     "Headline 1": "", "Headline 2": "", "Headline 3": "",
                     "Description 1": "", "Description 2": "", "Final URL": ""
                 }
                 writer.writerow(kw_row)
 
-            # 2. AD ROW (only once per Ad Group)
-            ad_key = (campaign, ad_group)
-            if ad_key not in ads_created:
+            # 4. AD ROW (only once per Ad Group)
+            ad_row_key = (campaign, ad_group)
+            if ad_row_key not in ads_created:
                 h1 = row[mapping_indices["Headline 1"]].strip() if "Headline 1" in mapping_indices else ""
                 h2 = row[mapping_indices["Headline 2"]].strip() if "Headline 2" in mapping_indices else ""
                 h3 = row[mapping_indices["Headline 3"]].strip() if "Headline 3" in mapping_indices else ""
@@ -135,24 +177,24 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                     "Campaign": campaign,
                     "Ad group": ad_group,
                     "Ad type": "Responsive search ad",
-                    "Keyword": "",
-                    "Max CPC": "",
+                    "Campaign status": "", "Budget": "", "Budget type": "", "Campaign type": "",
+                    "Ad group status": "", "Keyword": "", "Max CPC": "",
                     "Headline 1": h1, "Headline 2": h2, "Headline 3": h3,
                     "Description 1": d1, "Description 2": d2, "Final URL": current_url
                 }
                 writer.writerow(ad_row)
-                ads_created.add(ad_key)
+                ads_created.add(ad_row_key)
 
 if __name__ == "__main__":
     input_f = "без пред  2 upd Copy koktem шаблон Города АП - Объявления Гугл.csv"
     if not os.path.exists(input_f):
         input_f = "без пред  2 upd Copy koktem шаблон Города АП - Объявления Гугл (1).csv"
 
-    print(f"Generating Almaty campaign (Standard Bulk Upload format)...")
+    print(f"Generating Almaty campaign (Creation + Split format)...")
     clean_csv(input_f, "google_ads_almaty.csv", base_url="https://kz.henrybonnar.com/")
     
-    print(f"Generating Tashkent campaign (Standard Bulk Upload format)...")
+    print(f"Generating Tashkent campaign (Creation + Split format)...")
     tash_repl = {"Алматы": "Ташкент", "Алматыда": "Ташкентте", "almaty": "tashkent", "Almaty": "Tashkent"}
     clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tash_repl, base_url="https://uz.henrybonnar.com/")
     
-    print("Done. Headers 'Action' and 'Ad type' added for 100% recognition.")
+    print("Done. Campaigns and Ad Groups creation rows included.")
