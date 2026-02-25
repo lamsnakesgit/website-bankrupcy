@@ -31,10 +31,10 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
         print(f"Could not read {input_file} or file is empty")
         return
 
-    # Headers mapping to standard Google Ads Editor format
+    # Headers mapping to standard Google Ads Editor / Web format
     mapping = {
         "Campaign": "Campaign",
-        "Adgoup": "Ad group",
+        "Adgoup": "Ad Group",
         "Фраза (с минус-словами)": "Keyword",
         "Headline 1": "Headline 1",
         "Headline 2": "Headline 2",
@@ -64,12 +64,13 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
         return
 
     data_rows = rows[header_row_idx + 1:]
-    new_fieldnames = ["Campaign", "Ad group", "Keyword", "Headline 1", "Headline 2", "Headline 3", "Description 1", "Description 2", "Max CPC", "Final URL"]
+    new_fieldnames = ["Campaign", "Ad Group", "Keyword", "Headline 1", "Headline 2", "Headline 3", "Description 1", "Description 2", "Max CPC", "Final URL"]
     utm_string = "?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}"
 
-    with open(output_file, mode='w', encoding='utf-8-sig', newline='') as fout:
-        # Using semicolon for local Excel/Editor compatibility
-        writer = csv.DictWriter(fout, fieldnames=new_fieldnames, delimiter=';')
+    # Use UTF-8 for maximum compatibility with Web UI
+    with open(output_file, mode='w', encoding='utf-8', newline='') as fout:
+        # Returning to COMMA (,) as it is the most standard for Google Ads Web UI
+        writer = csv.DictWriter(fout, fieldnames=new_fieldnames, delimiter=',')
         writer.writeheader()
         
         for row in data_rows:
@@ -90,13 +91,13 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                     val = val.strip('"')
                 
                 if field == "Max CPC":
+                    # Ensure dot for decimals in Google Ads
                     val = val.replace(',', '.')
                 
                 if field == "Final URL":
                     if not val or val.lower() == "nan":
                         current_url = base_url
                     else:
-                        # If user provided a URL, we keep it but ensure it has UTM
                         current_url = val
                     
                     if not current_url.startswith("http"):
@@ -128,4 +129,4 @@ if __name__ == "__main__":
     }
     clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tashkent_replacements, base_url="https://uz.henrybonnar.com/")
     
-    print("Done. Generated google_ads_almaty.csv and google_ads_tashkent.csv with updated URLs.")
+    print("Done. Generated google_ads_almaty.csv and google_ads_tashkent.csv with COMMA (,) delimiter.")
