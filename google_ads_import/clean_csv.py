@@ -32,7 +32,7 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
     # Headers mapping
     mapping = {
         "Campaign": "Campaign",
-        "Adgoup": "Ad Group",
+        "Adgoup": "Ad group",
         "Фраза (с минус-словами)": "Keyword",
         "Headline 1": "Headline 1",
         "Headline 2": "Headline 2",
@@ -61,22 +61,27 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
         return
 
     data_rows = rows[header_row_idx + 1:]
-    new_fieldnames = ["Campaign", "Ad Group", "Keyword", "Headline 1", "Headline 2", "Headline 3", "Description 1", "Description 2", "Max CPC", "Final URL"]
+    
+    # Adding 'Action' and 'Ad type' for better recognition by Web UI
+    new_fieldnames = [
+        "Action", "Campaign", "Ad group", "Ad type", "Keyword", 
+        "Headline 1", "Headline 2", "Headline 3", 
+        "Description 1", "Description 2", "Max CPC", "Final URL"
+    ]
     utm_string = "?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}"
 
-    # To keep track of ads created per ad group to avoid duplicates
     ads_created = set()
 
-    with open(output_file, mode='w', encoding='utf-8', newline='') as fout:
+    # utf-8-sig for Excel/Google Sheets compatibility
+    with open(output_file, mode='w', encoding='utf-8-sig', newline='') as fout:
         writer = csv.DictWriter(fout, fieldnames=new_fieldnames, delimiter=',')
         writer.writeheader()
         
         for row in data_rows:
             if not any(row): continue
             
-            # Extract basic info
             campaign = row[mapping_indices["Campaign"]].strip() if "Campaign" in mapping_indices else ""
-            ad_group = row[mapping_indices["Ad Group"]].strip() if "Ad Group" in mapping_indices else ""
+            ad_group = row[mapping_indices["Ad group"]].strip() if "Ad group" in mapping_indices else ""
             
             if replace_map:
                 for old, new in replace_map.items():
@@ -89,8 +94,10 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
             
             if keyword:
                 kw_row = {
+                    "Action": "Add",
                     "Campaign": campaign,
-                    "Ad Group": ad_group,
+                    "Ad group": ad_group,
+                    "Ad type": "", # Leave empty for keywords
                     "Keyword": keyword,
                     "Max CPC": max_cpc,
                     "Headline 1": "", "Headline 2": "", "Headline 3": "",
@@ -124,8 +131,10 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                     current_url += utm_string
 
                 ad_row = {
+                    "Action": "Add",
                     "Campaign": campaign,
-                    "Ad Group": ad_group,
+                    "Ad group": ad_group,
+                    "Ad type": "Responsive search ad",
                     "Keyword": "",
                     "Max CPC": "",
                     "Headline 1": h1, "Headline 2": h2, "Headline 3": h3,
@@ -139,11 +148,11 @@ if __name__ == "__main__":
     if not os.path.exists(input_f):
         input_f = "без пред  2 upd Copy koktem шаблон Города АП - Объявления Гугл (1).csv"
 
-    print(f"Generating Almaty campaign (Split entities)...")
+    print(f"Generating Almaty campaign (Standard Bulk Upload format)...")
     clean_csv(input_f, "google_ads_almaty.csv", base_url="https://kz.henrybonnar.com/")
     
-    print(f"Generating Tashkent campaign (Split entities)...")
+    print(f"Generating Tashkent campaign (Standard Bulk Upload format)...")
     tash_repl = {"Алматы": "Ташкент", "Алматыда": "Ташкентте", "almaty": "tashkent", "Almaty": "Tashkent"}
     clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tash_repl, base_url="https://uz.henrybonnar.com/")
     
-    print("Done. Entities split: Keywords and Ads are now in separate rows.")
+    print("Done. Headers 'Action' and 'Ad type' added for 100% recognition.")
