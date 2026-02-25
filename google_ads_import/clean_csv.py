@@ -214,7 +214,7 @@ if __name__ == "__main__":
         "Алматыда": "Ташкентте", 
         "almaty": "tashkent", 
         "Almaty": "Tashkent",
-        "koktem almaty 1.0 АП": "Search-344 Tashkent Uzb ru"
+        "koktem almaty 1.0 АП": "koktem tashkent"
     }
     clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tash_repl, base_url="https://uz.henrybonnar.com/")
     
