@@ -210,11 +210,11 @@ if __name__ == "__main__":
     
     print(f"Generating Tashkent campaign (Creation + Split format)...")
     tash_repl = {
+        "koktem almaty 1.0 АП": "Search-344 Tashkent Uzb ru",
         "Алматы": "Ташкент", 
         "Алматыда": "Ташкентте", 
         "almaty": "tashkent", 
-        "Almaty": "Tashkent",
-        "koktem almaty 1.0 АП": "Search-344 Tashkent Uzb ru"
+        "Almaty": "Tashkent"
     }
     clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tash_repl, base_url="https://uz.henrybonnar.com/")
     
