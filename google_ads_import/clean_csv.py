@@ -191,10 +191,16 @@ if __name__ == "__main__":
         input_f = "без пред  2 upd Copy koktem шаблон Города АП - Объявления Гугл (1).csv"
 
     print(f"Generating Almaty campaign (Creation + Split format)...")
-    clean_csv(input_f, "google_ads_almaty.csv", base_url="https://kz.henrybonnar.com/")
+    clean_csv(input_f, "google_ads_almaty.csv", base_url="https://kz.henrybonnar.com/", replace_map={"koktem almaty 1.0 АП": "Search-344 Almaty-2-26"})
     
     print(f"Generating Tashkent campaign (Creation + Split format)...")
-    tash_repl = {"Алматы": "Ташкент", "Алматыда": "Ташкентте", "almaty": "tashkent", "Almaty": "Tashkent"}
+    tash_repl = {
+        "Алматы": "Ташкент", 
+        "Алматыда": "Ташкентте", 
+        "almaty": "tashkent", 
+        "Almaty": "Tashkent",
+        "koktem almaty 1.0 АП": "Search-344 Tashkent Uzb ru"
+    }
     clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tash_repl, base_url="https://uz.henrybonnar.com/")
     
     print("Done. Campaigns and Ad Groups creation rows included.")
