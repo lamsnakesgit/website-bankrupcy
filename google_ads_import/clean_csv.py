@@ -62,9 +62,10 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
 
     data_rows = rows[header_row_idx + 1:]
     
-    # Headers for Google Ads Bulk Upload (Web UI)
+    # Headers for Google Ads Bulk Upload (Web UI & Editor)
     new_fieldnames = [
         "Action", "Campaign", "Campaign status", "Budget", "Budget type", "Campaign type",
+        "Networks", "Languages", "Locations", "Bidding strategy type",
         "Ad group", "Ad group status", "Ad type", "Keyword", 
         "Headline 1", "Headline 2", "Headline 3", 
         "Description 1", "Description 2", "Max CPC", "Final URL"
@@ -75,8 +76,11 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
     ad_groups_created = set()
     ads_created = set()
 
-    # Using 'utf-8' without BOM is sometimes safer for Web UI, but Google Ads usually handles utf-8-sig well.
-    # Let's use utf-8 for max compatibility.
+    # Determine default location based on replace_map or base_url
+    default_location = "Almaty"
+    if replace_map and "Ташкент" in replace_map.values():
+        default_location = "Tashkent"
+
     with open(output_file, mode='w', encoding='utf-8', newline='') as fout:
         writer = csv.DictWriter(fout, fieldnames=new_fieldnames, delimiter=',')
         writer.writeheader()
@@ -107,6 +111,10 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                     "Budget": "500",
                     "Budget type": "Daily",
                     "Campaign type": "Search",
+                    "Networks": "Google search;Search partners",
+                    "Languages": "ru;kk;en",
+                    "Locations": default_location,
+                    "Bidding strategy type": "Manual CPC",
                     "Ad group": "", "Ad group status": "", "Ad type": "", "Keyword": "",
                     "Headline 1": "", "Headline 2": "", "Headline 3": "",
                     "Description 1": "", "Description 2": "", "Max CPC": "", "Final URL": ""
@@ -117,14 +125,20 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
             # 2. AD GROUP CREATION ROW
             ad_group_key = (campaign, ad_group)
             if ad_group and ad_group_key not in ad_groups_created:
+                # Try to get a default bid from the current row
+                row_max_cpc = row[mapping_indices["Max CPC"]].strip().replace(',', '.') if "Max CPC" in mapping_indices else "0.50"
+                if not row_max_cpc: row_max_cpc = "0.50"
+
                 ag_row = {
                     "Action": "Add",
                     "Campaign": campaign,
                     "Ad group": ad_group,
                     "Ad group status": "Enabled",
+                    "Max CPC": row_max_cpc, # Crucial for Editor
                     "Campaign status": "", "Budget": "", "Budget type": "", "Campaign type": "",
+                    "Networks": "", "Languages": "", "Locations": "", "Bidding strategy type": "",
                     "Ad type": "", "Keyword": "", "Headline 1": "", "Headline 2": "", "Headline 3": "",
-                    "Description 1": "", "Description 2": "", "Max CPC": "", "Final URL": ""
+                    "Description 1": "", "Description 2": "", "Final URL": ""
                 }
                 writer.writerow(ag_row)
                 ad_groups_created.add(ad_group_key)
@@ -141,6 +155,7 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                     "Keyword": keyword,
                     "Max CPC": max_cpc,
                     "Campaign status": "", "Budget": "", "Budget type": "", "Campaign type": "",
+                    "Networks": "", "Languages": "", "Locations": "", "Bidding strategy type": "",
                     "Ad group status": "", "Ad type": "",
                     "Headline 1": "", "Headline 2": "", "Headline 3": "",
                     "Description 1": "", "Description 2": "", "Final URL": ""
