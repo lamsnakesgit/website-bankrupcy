@@ -13,7 +13,6 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
             with open(input_file, mode='r', encoding=encoding) as f:
                 content = f.read()
                 if not content.strip(): continue
-                # Determine delimiter from content
                 try:
                     dialect = csv.Sniffer().sniff(content[:10000], delimiters=',;')
                 except:
@@ -22,16 +21,15 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
                 f.seek(0)
                 reader = csv.reader(f, dialect=dialect)
                 rows = list(reader)
-                if rows:
-                    break
+                if rows: break
         except Exception:
             continue
     
     if not rows:
-        print(f"Could not read {input_file} or file is empty")
+        print(f"Could not read {input_file}")
         return
 
-    # Headers mapping to standard Google Ads Editor / Web format
+    # Headers mapping
     mapping = {
         "Campaign": "Campaign",
         "Adgoup": "Ad Group",
@@ -45,7 +43,6 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
         "Ссылка": "Final URL"
     }
 
-    # Find header row and indices
     header_row_idx = -1
     mapping_indices = {}
     
@@ -67,66 +64,86 @@ def clean_csv(input_file, output_file, replace_map=None, base_url="https://kokte
     new_fieldnames = ["Campaign", "Ad Group", "Keyword", "Headline 1", "Headline 2", "Headline 3", "Description 1", "Description 2", "Max CPC", "Final URL"]
     utm_string = "?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}"
 
-    # Use UTF-8 for maximum compatibility with Web UI
+    # To keep track of ads created per ad group to avoid duplicates
+    ads_created = set()
+
     with open(output_file, mode='w', encoding='utf-8', newline='') as fout:
-        # Returning to COMMA (,) as it is the most standard for Google Ads Web UI
         writer = csv.DictWriter(fout, fieldnames=new_fieldnames, delimiter=',')
         writer.writeheader()
         
         for row in data_rows:
             if not any(row): continue
             
-            new_row = {}
-            for field in new_fieldnames:
-                idx = mapping_indices.get(field)
-                val = row[idx].strip() if idx is not None and idx < len(row) else ""
-                
-                # Apply replacements
+            # Extract basic info
+            campaign = row[mapping_indices["Campaign"]].strip() if "Campaign" in mapping_indices else ""
+            ad_group = row[mapping_indices["Ad Group"]].strip() if "Ad Group" in mapping_indices else ""
+            
+            if replace_map:
+                for old, new in replace_map.items():
+                    campaign = campaign.replace(old, new)
+                    ad_group = ad_group.replace(old, new)
+
+            # 1. KEYWORD ROW
+            keyword = row[mapping_indices["Keyword"]].strip().strip('"') if "Keyword" in mapping_indices else ""
+            max_cpc = row[mapping_indices["Max CPC"]].strip().replace(',', '.') if "Max CPC" in mapping_indices else ""
+            
+            if keyword:
+                kw_row = {
+                    "Campaign": campaign,
+                    "Ad Group": ad_group,
+                    "Keyword": keyword,
+                    "Max CPC": max_cpc,
+                    "Headline 1": "", "Headline 2": "", "Headline 3": "",
+                    "Description 1": "", "Description 2": "", "Final URL": ""
+                }
+                writer.writerow(kw_row)
+
+            # 2. AD ROW (only once per Ad Group)
+            ad_key = (campaign, ad_group)
+            if ad_key not in ads_created:
+                h1 = row[mapping_indices["Headline 1"]].strip() if "Headline 1" in mapping_indices else ""
+                h2 = row[mapping_indices["Headline 2"]].strip() if "Headline 2" in mapping_indices else ""
+                h3 = row[mapping_indices["Headline 3"]].strip() if "Headline 3" in mapping_indices else ""
+                d1 = row[mapping_indices["Description 1"]].strip() if "Description 1" in mapping_indices else ""
+                d2 = row[mapping_indices["Description 2"]].strip() if "Description 2" in mapping_indices else ""
+                url_val = row[mapping_indices["Final URL"]].strip() if "Final URL" in mapping_indices else ""
+
                 if replace_map:
                     for old, new in replace_map.items():
-                        val = val.replace(old, new)
+                        h1, h2, h3, d1, d2 = [s.replace(old, new) for s in [h1, h2, h3, d1, d2]]
+
+                if not url_val or url_val.lower() == "nan":
+                    current_url = base_url
+                else:
+                    current_url = url_val
                 
-                # Data cleanup
-                if field == "Keyword":
-                    val = val.strip('"')
+                if not current_url.startswith("http"):
+                    current_url = "https://" + current_url if "." in current_url else base_url
                 
-                if field == "Max CPC":
-                    # Ensure dot for decimals in Google Ads
-                    val = val.replace(',', '.')
-                
-                if field == "Final URL":
-                    if not val or val.lower() == "nan":
-                        current_url = base_url
-                    else:
-                        current_url = val
-                    
-                    if not current_url.startswith("http"):
-                        current_url = "https://" + current_url if "." in current_url else base_url
-                    
-                    if "?" not in current_url:
-                        current_url += utm_string
-                
-                new_row[field] = val if field != "Final URL" else current_url
-            
-            writer.writerow(new_row)
+                if "?" not in current_url:
+                    current_url += utm_string
+
+                ad_row = {
+                    "Campaign": campaign,
+                    "Ad Group": ad_group,
+                    "Keyword": "",
+                    "Max CPC": "",
+                    "Headline 1": h1, "Headline 2": h2, "Headline 3": h3,
+                    "Description 1": d1, "Description 2": d2, "Final URL": current_url
+                }
+                writer.writerow(ad_row)
+                ads_created.add(ad_key)
 
 if __name__ == "__main__":
     input_f = "без пред  2 upd Copy koktem шаблон Города АП - Объявления Гугл.csv"
     if not os.path.exists(input_f):
         input_f = "без пред  2 upd Copy koktem шаблон Города АП - Объявления Гугл (1).csv"
 
-    # 1. Almaty
-    print(f"Generating Almaty campaign...")
+    print(f"Generating Almaty campaign (Split entities)...")
     clean_csv(input_f, "google_ads_almaty.csv", base_url="https://kz.henrybonnar.com/")
     
-    # 2. Tashkent
-    print(f"Generating Tashkent campaign...")
-    tashkent_replacements = {
-        "Алматы": "Ташкент",
-        "Алматыда": "Ташкентте",
-        "almaty": "tashkent",
-        "Almaty": "Tashkent"
-    }
-    clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tashkent_replacements, base_url="https://uz.henrybonnar.com/")
+    print(f"Generating Tashkent campaign (Split entities)...")
+    tash_repl = {"Алматы": "Ташкент", "Алматыда": "Ташкентте", "almaty": "tashkent", "Almaty": "Tashkent"}
+    clean_csv(input_f, "google_ads_tashkent.csv", replace_map=tash_repl, base_url="https://uz.henrybonnar.com/")
     
-    print("Done. Generated google_ads_almaty.csv and google_ads_tashkent.csv with COMMA (,) delimiter.")
+    print("Done. Entities split: Keywords and Ads are now in separate rows.")
